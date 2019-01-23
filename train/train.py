@@ -266,7 +266,7 @@ def train_one_epoch(sess, ops, train_writer):
         iou3ds_sum += np.sum(iou3ds)
         iou3d_correct_cnt += np.sum(iou3ds>=0.7)
 
-        if (batch_idx+1)%10 == 0:
+        if (batch_idx+1)%1000 == 0:
             log_string(' -- %03d / %03d --' % (batch_idx+1, num_batches))
             log_string('mean loss: %f' % (loss_sum / 10))
             log_string('segmentation accuracy: %f' % \

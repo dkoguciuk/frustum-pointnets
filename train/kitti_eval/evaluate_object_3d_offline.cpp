@@ -303,10 +303,16 @@ inline double groundBoxOverlap(tDetection d, tGroundtruth g, int32_t criterion =
     union_(gp, dp, un);
 
     double inter_area = in.empty() ? 0 : area(in.front());
-    double union_area = area(un.front());
+
     double o;
-    if(criterion==-1)     // union
-        o = inter_area / union_area;
+    if(criterion==-1){     // union
+        if (un.size() > 0){
+          double union_area = area(un.front());
+          o = inter_area / union_area;
+        }
+        else
+            o = 0.0;
+    }
     else if(criterion==0) // bbox_a
         o = inter_area / area(dp);
     else if(criterion==1) // bbox_b

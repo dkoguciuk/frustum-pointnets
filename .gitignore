@@ -1,0 +1,9 @@
+*~
+train/detection*
+train/log*
+.idea/*
+dataset/KITTI/*
+kitti/*.pickle
+*.pyc
+*.o
+*.so

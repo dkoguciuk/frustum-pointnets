@@ -14,6 +14,7 @@ import importlib
 import numpy as np
 import tensorflow as tf
 import cPickle as pickle
+import time
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
@@ -108,7 +109,8 @@ def inference(sess, ops, pc, one_hot_vec, batch_size):
     size_logits = np.zeros((pc.shape[0], NUM_SIZE_CLUSTER))
     size_residuals = np.zeros((pc.shape[0], NUM_SIZE_CLUSTER, 3))
     scores = np.zeros((pc.shape[0],)) # 3D box score 
-   
+
+    time_sum = 0.0
     ep = ops['end_points'] 
     for i in range(num_batches):
         feed_dict = {\
@@ -116,6 +118,7 @@ def inference(sess, ops, pc, one_hot_vec, batch_size):
             ops['one_hot_vec_pl']: one_hot_vec[i*batch_size:(i+1)*batch_size,:],
             ops['is_training_pl']: False}
 
+        time_0 = time.time()
         batch_logits, batch_centers, \
         batch_heading_scores, batch_heading_residuals, \
         batch_size_scores, batch_size_residuals = \
@@ -123,6 +126,7 @@ def inference(sess, ops, pc, one_hot_vec, batch_size):
                 ep['heading_scores'], ep['heading_residuals'],
                 ep['size_scores'], ep['size_residuals']],
                 feed_dict=feed_dict)
+        time_sum += time.time() - time_0
 
         logits[i*batch_size:(i+1)*batch_size,...] = batch_logits
         centers[i*batch_size:(i+1)*batch_size,...] = batch_centers
@@ -142,6 +146,7 @@ def inference(sess, ops, pc, one_hot_vec, batch_size):
         scores[i*batch_size:(i+1)*batch_size] = batch_scores 
         # Finished computing scores
 
+    avg_time = time_sum / num_batches
     heading_cls = np.argmax(heading_logits, 1) # B
     size_cls = np.argmax(size_logits, 1) # B
     heading_res = np.array([heading_residuals[i,heading_cls[i]] \
@@ -150,7 +155,7 @@ def inference(sess, ops, pc, one_hot_vec, batch_size):
         for i in range(pc.shape[0])])
 
     return np.argmax(logits, 2), centers, heading_cls, heading_res, \
-        size_cls, size_res, scores
+        size_cls, size_res, scores, avg_time
 
 def write_detection_results(result_dir, id_list, type_list, box2d_list, center_list, \
                             heading_cls_list, heading_res_list, \
@@ -215,6 +220,7 @@ def test_from_rgb_detection(output_filename, result_dir=None):
     batch_data_to_feed = np.zeros((batch_size, NUM_POINT, NUM_CHANNEL))
     batch_one_hot_to_feed = np.zeros((batch_size, 3))
     sess, ops = get_session_and_ops(batch_size=batch_size, num_point=NUM_POINT)
+    time_sum = 0.0
     for batch_idx in range(num_batches):
         print('batch idx: %d' % (batch_idx))
         start_idx = batch_idx * batch_size
@@ -228,12 +234,13 @@ def test_from_rgb_detection(output_filename, result_dir=None):
         batch_one_hot_to_feed[0:cur_batch_size,:] = batch_one_hot_vec
 
         # Run one batch inference
-	batch_output, batch_center_pred, \
+        batch_output, batch_center_pred, \
         batch_hclass_pred, batch_hres_pred, \
-        batch_sclass_pred, batch_sres_pred, batch_scores = \
+        batch_sclass_pred, batch_sres_pred, batch_scores, avg_time = \
             inference(sess, ops, batch_data_to_feed,
                 batch_one_hot_to_feed, batch_size=batch_size)
-	
+        time_sum += avg_time
+
         for i in range(cur_batch_size):
             ps_list.append(batch_data[i,...])
             segp_list.append(batch_output[i,...])
@@ -247,6 +254,7 @@ def test_from_rgb_detection(output_filename, result_dir=None):
             score_list.append(batch_rgb_prob[i]) # 2D RGB detection score
             onehot_list.append(batch_one_hot_vec[i])
 
+    print('Average batch time:', time_sum / num_batches)
     if FLAGS.dump_result:
         with open(output_filename, 'wp') as fp:
             pickle.dump(ps_list, fp)

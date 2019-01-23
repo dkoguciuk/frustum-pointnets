@@ -16,7 +16,7 @@ from model_util import point_cloud_masking, get_center_regression_net
 from model_util import placeholder_inputs, parse_output_to_tensors, get_loss
 
 def get_instance_seg_v1_net(point_cloud, one_hot_vec,
-                            is_training, bn_decay, end_points):
+                            is_training, bn_decay, end_points, name_prefix=''):
     ''' 3D instance segmentation PointNet v1 network.
     Input:
         point_cloud: TF tensor in shape (B,N,4)
@@ -39,25 +39,25 @@ def get_instance_seg_v1_net(point_cloud, one_hot_vec,
     net = tf_util.conv2d(net, 64, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv1', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv1', bn_decay=bn_decay)
     net = tf_util.conv2d(net, 64, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv2', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv2', bn_decay=bn_decay)
     point_feat = tf_util.conv2d(net, 64, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv3', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv3', bn_decay=bn_decay)
     net = tf_util.conv2d(point_feat, 128, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv4', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv4', bn_decay=bn_decay)
     net = tf_util.conv2d(net, 1024, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv5', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv5', bn_decay=bn_decay)
     global_feat = tf_util.max_pool2d(net, [num_point,1],
-                                     padding='VALID', scope='maxpool')
+                                     padding='VALID', scope=name_prefix + 'maxpool')
 
     global_feat = tf.concat([global_feat, tf.expand_dims(tf.expand_dims(one_hot_vec, 1), 1)], axis=3)
     global_feat_expand = tf.tile(global_feat, [1, num_point, 1, 1])
@@ -66,30 +66,30 @@ def get_instance_seg_v1_net(point_cloud, one_hot_vec,
     net = tf_util.conv2d(concat_feat, 512, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv6', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv6', bn_decay=bn_decay)
     net = tf_util.conv2d(net, 256, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv7', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv7', bn_decay=bn_decay)
     net = tf_util.conv2d(net, 128, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv8', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv8', bn_decay=bn_decay)
     net = tf_util.conv2d(net, 128, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv9', bn_decay=bn_decay)
-    net = tf_util.dropout(net, is_training, 'dp1', keep_prob=0.5)
+                         scope=name_prefix + 'conv9', bn_decay=bn_decay)
+    net = tf_util.dropout(net, is_training, name_prefix + 'dp1', keep_prob=0.5)
 
     logits = tf_util.conv2d(net, 2, [1,1],
                          padding='VALID', stride=[1,1], activation_fn=None,
-                         scope='conv10')
+                         scope=name_prefix + 'conv10')
     logits = tf.squeeze(logits, [2]) # BxNxC
     return logits, end_points
  
 
 def get_3d_box_estimation_v1_net(object_point_cloud, one_hot_vec,
-                                 is_training, bn_decay, end_points):
+                                 is_training, bn_decay, end_points, name_prefix=''):
     ''' 3D Box Estimation PointNet v1 network.
     Input:
         object_point_cloud: TF tensor in shape (B,M,C)
@@ -106,33 +106,33 @@ def get_3d_box_estimation_v1_net(object_point_cloud, one_hot_vec,
     net = tf_util.conv2d(net, 128, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv-reg1', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv-reg1', bn_decay=bn_decay)
     net = tf_util.conv2d(net, 128, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv-reg2', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv-reg2', bn_decay=bn_decay)
     net = tf_util.conv2d(net, 256, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv-reg3', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv-reg3', bn_decay=bn_decay)
     net = tf_util.conv2d(net, 512, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv-reg4', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv-reg4', bn_decay=bn_decay)
     net = tf_util.max_pool2d(net, [num_point,1],
-        padding='VALID', scope='maxpool2')
+        padding='VALID', scope=name_prefix + 'maxpool2')
     net = tf.squeeze(net, axis=[1,2])
     net = tf.concat([net, one_hot_vec], axis=1)
-    net = tf_util.fully_connected(net, 512, scope='fc1', bn=True,
+    net = tf_util.fully_connected(net, 512, scope=name_prefix + 'fc1', bn=True,
         is_training=is_training, bn_decay=bn_decay)
-    net = tf_util.fully_connected(net, 256, scope='fc2', bn=True,
+    net = tf_util.fully_connected(net, 256, scope=name_prefix + 'fc2', bn=True,
         is_training=is_training, bn_decay=bn_decay)
 
     # The first 3 numbers: box center coordinates (cx,cy,cz),
     # the next NUM_HEADING_BIN*2:  heading bin class scores and bin residuals
     # next NUM_SIZE_CLUSTER*4: box cluster scores and residuals
     output = tf_util.fully_connected(net,
-        3+NUM_HEADING_BIN*2+NUM_SIZE_CLUSTER*4, activation_fn=None, scope='fc3')
+        3+NUM_HEADING_BIN*2+NUM_SIZE_CLUSTER*4, activation_fn=None, scope=name_prefix + 'fc3')
     return output, end_points
 
 
@@ -154,9 +154,24 @@ def get_model(point_cloud, one_hot_vec, is_training, bn_decay=None):
     end_points = {}
     
     # 3D Instance Segmentation PointNet
-    logits, end_points = get_instance_seg_v1_net(\
+    logits_1, end_points = get_instance_seg_v1_net(\
         point_cloud, one_hot_vec,
-        is_training, bn_decay, end_points)
+        is_training, bn_decay, end_points, 'branch1_')
+    logits_2, end_points = get_instance_seg_v1_net( \
+        point_cloud, one_hot_vec,
+        is_training, bn_decay, end_points, 'branch2_')
+    logits_3, end_points = get_instance_seg_v1_net( \
+        point_cloud, one_hot_vec,
+        is_training, bn_decay, end_points, 'branch3_')
+
+    rand_select = tf.random_uniform([], 0, 3, tf.int32)
+
+    logits = tf.case([(tf.logical_and(is_training, tf.equal(rand_select, 0)), lambda: logits_1),
+                      (tf.logical_and(is_training, tf.equal(rand_select, 1)), lambda: logits_2),
+                      (tf.logical_and(is_training, tf.equal(rand_select, 2)), lambda: logits_3),
+                      (tf.logical_not(is_training),
+                       lambda: tf.reduce_mean(tf.stack((logits_1, logits_2, logits_3), axis=0), axis=0))])
+    # print('Logits shape:', logits.shape)
     end_points['mask_logits'] = logits
 
     # Masking
@@ -165,9 +180,22 @@ def get_model(point_cloud, one_hot_vec, is_training, bn_decay=None):
         point_cloud_masking(point_cloud, logits, end_points)
 
     # T-Net and coordinate translation
-    center_delta, end_points = get_center_regression_net(\
+    center_delta_1, end_points = get_center_regression_net(
         object_point_cloud_xyz, one_hot_vec,
-        is_training, bn_decay, end_points)
+        is_training, bn_decay, end_points, 'branch1_')
+    center_delta_2, end_points = get_center_regression_net(
+        object_point_cloud_xyz, one_hot_vec,
+        is_training, bn_decay, end_points, 'branch2_')
+    center_delta_3, end_points = get_center_regression_net(
+        object_point_cloud_xyz, one_hot_vec,
+        is_training, bn_decay, end_points, 'branch3_')
+    center_delta = tf.case([(tf.logical_and(is_training, tf.equal(rand_select, 0)), lambda: center_delta_1),
+                      (tf.logical_and(is_training, tf.equal(rand_select, 1)), lambda: center_delta_2),
+                      (tf.logical_and(is_training, tf.equal(rand_select, 2)), lambda: center_delta_3),
+                      (tf.logical_not(is_training),
+                       lambda: tf.reduce_mean(tf.stack((center_delta_1, center_delta_2, center_delta_3),
+                                                       axis=0), axis=0))])
+
     stage1_center = center_delta + mask_xyz_mean # Bx3
     end_points['stage1_center'] = stage1_center
     # Get object point cloud in object coordinate
@@ -175,9 +203,21 @@ def get_model(point_cloud, one_hot_vec, is_training, bn_decay=None):
         object_point_cloud_xyz - tf.expand_dims(center_delta, 1)
 
     # Amodel Box Estimation PointNet
-    output, end_points = get_3d_box_estimation_v1_net(\
+    output_1, end_points = get_3d_box_estimation_v1_net(
         object_point_cloud_xyz_new, one_hot_vec,
-        is_training, bn_decay, end_points)
+        is_training, bn_decay, end_points, 'branch1_')
+    output_2, end_points = get_3d_box_estimation_v1_net(
+        object_point_cloud_xyz_new, one_hot_vec,
+        is_training, bn_decay, end_points, 'branch2_')
+    output_3, end_points = get_3d_box_estimation_v1_net(
+        object_point_cloud_xyz_new, one_hot_vec,
+        is_training, bn_decay, end_points, 'branch3_')
+    output = tf.case([(tf.logical_and(is_training, tf.equal(rand_select, 0)), lambda: output_1),
+                            (tf.logical_and(is_training, tf.equal(rand_select, 1)), lambda: output_2),
+                            (tf.logical_and(is_training, tf.equal(rand_select, 2)), lambda: output_3),
+                            (tf.logical_not(is_training),
+                             lambda: tf.reduce_mean(tf.stack((output_1, output_2, output_3),
+                                                             axis=0), axis=0))])
 
     # Parse output to 3D box parameters
     end_points = parse_output_to_tensors(output, end_points)

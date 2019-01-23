@@ -238,7 +238,7 @@ def point_cloud_masking(point_cloud, logits, end_points, xyz_only=True):
 
 
 def get_center_regression_net(object_point_cloud, one_hot_vec,
-                              is_training, bn_decay, end_points):
+                              is_training, bn_decay, end_points, name_prefix=''):
     ''' Regression network for center delta. a.k.a. T-Net.
     Input:
         object_point_cloud: TF tensor in shape (B,M,C)
@@ -253,25 +253,25 @@ def get_center_regression_net(object_point_cloud, one_hot_vec,
     net = tf_util.conv2d(net, 128, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv-reg1-stage1', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv-reg1-stage1', bn_decay=bn_decay)
     net = tf_util.conv2d(net, 128, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv-reg2-stage1', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv-reg2-stage1', bn_decay=bn_decay)
     net = tf_util.conv2d(net, 256, [1,1],
                          padding='VALID', stride=[1,1],
                          bn=True, is_training=is_training,
-                         scope='conv-reg3-stage1', bn_decay=bn_decay)
+                         scope=name_prefix + 'conv-reg3-stage1', bn_decay=bn_decay)
     net = tf_util.max_pool2d(net, [num_point,1],
-        padding='VALID', scope='maxpool-stage1')
+        padding='VALID', scope=name_prefix + 'maxpool-stage1')
     net = tf.squeeze(net, axis=[1,2])
     net = tf.concat([net, one_hot_vec], axis=1)
-    net = tf_util.fully_connected(net, 256, scope='fc1-stage1', bn=True,
+    net = tf_util.fully_connected(net, 256, scope=name_prefix + 'fc1-stage1', bn=True,
         is_training=is_training, bn_decay=bn_decay)
-    net = tf_util.fully_connected(net, 128, scope='fc2-stage1', bn=True,
+    net = tf_util.fully_connected(net, 128, scope=name_prefix + 'fc2-stage1', bn=True,
         is_training=is_training, bn_decay=bn_decay)
     predicted_center = tf_util.fully_connected(net, 3, activation_fn=None,
-        scope='fc3-stage1')
+        scope=name_prefix + 'fc3-stage1')
     return predicted_center, end_points
 
 
