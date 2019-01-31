@@ -33,6 +33,7 @@ parser.add_argument('--decay_step', type=int, default=200000, help='Decay step f
 parser.add_argument('--decay_rate', type=float, default=0.7, help='Decay rate for lr decay [default: 0.7]')
 parser.add_argument('--no_intensity', action='store_true', help='Only use XYZ for training')
 parser.add_argument('--restore_model_path', default=None, help='Restore model path e.g. log/model.ckpt [default: None]')
+parser.add_argument('--ensemble_config', type=str, default='EEE', help='Ensemble config, e.g. 111 or EEE')
 FLAGS = parser.parse_args()
 
 # Set training configurations
@@ -115,7 +116,7 @@ def train():
 
             # Get model and losses 
             end_points = MODEL.get_model(pointclouds_pl, one_hot_vec_pl,
-                is_training_pl, bn_decay=bn_decay)
+                is_training_pl, bn_decay=bn_decay, config=FLAGS.ensemble_config)
             loss = MODEL.get_loss(labels_pl, centers_pl,
                 heading_class_label_pl, heading_residual_label_pl,
                 size_class_label_pl, size_residual_label_pl, end_points)
@@ -156,6 +157,9 @@ def train():
             train_op = optimizer.minimize(loss, global_step=batch)
             
             # Add ops to save and restore all the variables.
+            var_list = [n for n in tf.get_collection(tf.GraphKeys.VARIABLES)
+                        if ('branch' in n.name and 'Adam' not in n.name)]
+            restorer = tf.train.Saver(var_list=var_list)
             saver = tf.train.Saver()
         
         # Create a session
@@ -175,7 +179,9 @@ def train():
             init = tf.global_variables_initializer()
             sess.run(init)
         else:
-            saver.restore(sess, FLAGS.restore_model_path)
+            init = tf.global_variables_initializer()
+            sess.run(init)
+            restorer.restore(sess, FLAGS.restore_model_path)
 
         ops = {'pointclouds_pl': pointclouds_pl,
                'one_hot_vec_pl': one_hot_vec_pl,
@@ -268,13 +274,13 @@ def train_one_epoch(sess, ops, train_writer):
 
         if (batch_idx+1)%1000 == 0:
             log_string(' -- %03d / %03d --' % (batch_idx+1, num_batches))
-            log_string('mean loss: %f' % (loss_sum / 10))
+            log_string('mean loss: %f' % (loss_sum / 1000))
             log_string('segmentation accuracy: %f' % \
                 (total_correct / float(total_seen)))
             log_string('box IoU (ground/3D): %f / %f' % \
-                (iou2ds_sum / float(BATCH_SIZE*10), iou3ds_sum / float(BATCH_SIZE*10)))
+                (iou2ds_sum / float(BATCH_SIZE*1000), iou3ds_sum / float(BATCH_SIZE*1000)))
             log_string('box estimation accuracy (IoU=0.7): %f' % \
-                (float(iou3d_correct_cnt)/float(BATCH_SIZE*10)))
+                (float(iou3d_correct_cnt)/float(BATCH_SIZE*1000)))
             total_correct = 0
             total_seen = 0
             loss_sum = 0

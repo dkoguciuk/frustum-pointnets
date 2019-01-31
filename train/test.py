@@ -34,6 +34,7 @@ parser.add_argument('--data_path', default=None, help='frustum dataset pickle fi
 parser.add_argument('--from_rgb_detection', action='store_true', help='test from dataset files from rgb detection.')
 parser.add_argument('--idx_path', default=None, help='filename of txt where each line is a data idx, used for rgb detection -- write <id>.txt for all frames. [default: None]')
 parser.add_argument('--dump_result', action='store_true', help='If true, also dump results to .pickle file')
+parser.add_argument('--ensemble_config', type=str, default='EEE', help='Ensemble config, e.g. 111 or EEE')
 FLAGS = parser.parse_args()
 
 # Set training configurations
@@ -62,7 +63,7 @@ def get_session_and_ops(batch_size, num_point):
                 MODEL.placeholder_inputs(batch_size, num_point)
             is_training_pl = tf.placeholder(tf.bool, shape=())
             end_points = MODEL.get_model(pointclouds_pl, one_hot_vec_pl,
-                is_training_pl)
+                is_training_pl, config=FLAGS.ensemble_config)
             loss = MODEL.get_loss(labels_pl, centers_pl,
                 heading_class_label_pl, heading_residual_label_pl,
                 size_class_label_pl, size_residual_label_pl, end_points)

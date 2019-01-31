@@ -136,7 +136,7 @@ def get_3d_box_estimation_v1_net(object_point_cloud, one_hot_vec,
     return output, end_points
 
 
-def get_model(point_cloud, one_hot_vec, is_training, bn_decay=None):
+def get_model(point_cloud, one_hot_vec, is_training, bn_decay=None, config='EEE'):
     ''' Frustum PointNets model. The model predict 3D object masks and
     amodel bounding boxes for objects in frustum point clouds.
 
@@ -164,14 +164,15 @@ def get_model(point_cloud, one_hot_vec, is_training, bn_decay=None):
         point_cloud, one_hot_vec,
         is_training, bn_decay, end_points, 'branch3_')
 
-    rand_select = tf.random_uniform([], 0, 3, tf.int32)
+    if config[0] == '1':
+        logits = logits_1
+    elif config[0] == '2':
+        logits = logits_2
+    elif config[0] == '3':
+        logits = logits_3
+    elif config[0] == 'E':
+        logits = tf.reduce_mean(tf.stack((logits_1, logits_2, logits_3), axis=0), axis=0)
 
-    logits = tf.case([(tf.logical_and(is_training, tf.equal(rand_select, 0)), lambda: logits_1),
-                      (tf.logical_and(is_training, tf.equal(rand_select, 1)), lambda: logits_2),
-                      (tf.logical_and(is_training, tf.equal(rand_select, 2)), lambda: logits_3),
-                      (tf.logical_not(is_training),
-                       lambda: tf.reduce_mean(tf.stack((logits_1, logits_2, logits_3), axis=0), axis=0))])
-    # print('Logits shape:', logits.shape)
     end_points['mask_logits'] = logits
 
     # Masking
@@ -189,12 +190,15 @@ def get_model(point_cloud, one_hot_vec, is_training, bn_decay=None):
     center_delta_3, end_points = get_center_regression_net(
         object_point_cloud_xyz, one_hot_vec,
         is_training, bn_decay, end_points, 'branch3_')
-    center_delta = tf.case([(tf.logical_and(is_training, tf.equal(rand_select, 0)), lambda: center_delta_1),
-                      (tf.logical_and(is_training, tf.equal(rand_select, 1)), lambda: center_delta_2),
-                      (tf.logical_and(is_training, tf.equal(rand_select, 2)), lambda: center_delta_3),
-                      (tf.logical_not(is_training),
-                       lambda: tf.reduce_mean(tf.stack((center_delta_1, center_delta_2, center_delta_3),
-                                                       axis=0), axis=0))])
+
+    if config[1] == '1':
+        center_delta = center_delta_1
+    elif config[1] == '2':
+        center_delta = center_delta_2
+    elif config[1] == '3':
+        center_delta = center_delta_3
+    elif config[1] == 'E':
+        center_delta = tf.reduce_mean(tf.stack((center_delta_1, center_delta_2, center_delta_3), axis=0), axis=0)
 
     stage1_center = center_delta + mask_xyz_mean # Bx3
     end_points['stage1_center'] = stage1_center
@@ -212,12 +216,15 @@ def get_model(point_cloud, one_hot_vec, is_training, bn_decay=None):
     output_3, end_points = get_3d_box_estimation_v1_net(
         object_point_cloud_xyz_new, one_hot_vec,
         is_training, bn_decay, end_points, 'branch3_')
-    output = tf.case([(tf.logical_and(is_training, tf.equal(rand_select, 0)), lambda: output_1),
-                            (tf.logical_and(is_training, tf.equal(rand_select, 1)), lambda: output_2),
-                            (tf.logical_and(is_training, tf.equal(rand_select, 2)), lambda: output_3),
-                            (tf.logical_not(is_training),
-                             lambda: tf.reduce_mean(tf.stack((output_1, output_2, output_3),
-                                                             axis=0), axis=0))])
+
+    if config[2] == '1':
+        output = output_1
+    elif config[2] == '2':
+        output = output_2
+    elif config[2] == '3':
+        output = output_3
+    elif config[2] == 'E':
+        output = tf.reduce_mean(tf.stack((output_1, output_2, output_3), axis=0), axis=0)
 
     # Parse output to 3D box parameters
     end_points = parse_output_to_tensors(output, end_points)
